@@ -1,0 +1,41 @@
+THIRD-PARTY LICENSES
+====================
+
+The Simple UNA Log Viewer source is MIT licensed (see LICENSE). The packaged
+Windows .exe bundles the third-party components below. Each remains under its
+own license. This file is a notice, not legal advice.
+
+------------------------------------------------------------------
+pywebview
+  License: BSD 3-Clause
+  https://github.com/r0x0r/pywebview
+
+------------------------------------------------------------------
+PyQt6 and PyQt6-WebEngine  (Riverbank Computing)
+  License: GNU GPL v3, OR a commercial Riverbank license.
+  https://www.riverbankcomputing.com/software/pyqt/
+  Note: PyQt6 is distributed under GPL v3 unless you hold a commercial
+  license. Bundling PyQt6 in a distributed binary brings that binary under
+  GPL v3 terms (the MIT source license still applies to this project's own
+  code). If you intend to distribute the .exe publicly, review your
+  obligations, or use a Qt commercial license. pywebview can also run on
+  other backends (for example EdgeChromium / WebView2 on Windows) if you
+  prefer to avoid the GPL dependency.
+
+------------------------------------------------------------------
+Qt  (The Qt Company)  -- underlying toolkit used by PyQt6
+  License: GNU LGPL v3, OR a commercial Qt license.
+  https://www.qt.io/licensing/
+
+------------------------------------------------------------------
+Sora  (font)
+  License: SIL Open Font License 1.1
+  https://fonts.google.com/specimen/Sora
+
+------------------------------------------------------------------
+JetBrains Mono  (font)
+  License: SIL Open Font License 1.1
+  https://www.jetbrains.com/lp/mono/
+
+------------------------------------------------------------------
+Full license texts are available at the URLs above.

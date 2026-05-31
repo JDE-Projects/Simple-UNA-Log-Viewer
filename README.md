@@ -1,0 +1,57 @@
+# Simple UNA Log Viewer
+
+View, filter, and export connection and event logs from a UniFi Network
+Application controller, with filters the UNA web UI doesn't offer. For network
+admins who need quick, focused log access across a site.
+
+Built by [JDE-Projects](https://github.com/JDE-Projects).
+
+## Highlights
+- Filter by site, time range, log type (General or Audit), category, and event.
+- Sortable results table; export everything to CSV (timezone-stamped column).
+- Read-only: makes no changes to the controller, sites, or device state.
+- Optional debug log, off by default, with credentials redacted.
+- Secrets are never saved (memory only, wiped on disconnect).
+
+## How it works
+- Backend: Python standard library (urllib) against the controller's v2
+  `system-log` API.
+- Window: pywebview on the Qt backend, UI in `simple_una_log_viewer-UI.html`.
+
+## Download and run
+Grab the latest `Simple UNA Log Viewer.exe` from the Releases page and
+double-click it. No Python or setup required. Windows only.
+Unsigned, so SmartScreen may warn the first time: More info > Run anyway.
+
+## Build from source (optional)
+- Python 3 on PATH.
+- `pip install pywebview PyQt6 PyQt6-WebEngine`
+- Keep `simple_una_log_viewer.py`, `simple_una_log_viewer-UI.html`, the
+  `fonts/` folder, the `.ico`, `.png`, and `-splash.png` together.
+- Run from source: `python simple_una_log_viewer.py`
+- Build the .exe: `Build_Simple_UNA_Log_Viewer.bat` -> `dist\Simple UNA Log Viewer.exe`
+
+## Using it
+1. Enter the controller URL, username, and password (a local admin account,
+   not SSO), then Connect.
+2. Pick a site, a time range, and the log type.
+3. Optionally check categories and/or events to narrow results. Leave both
+   unchecked for a global search across the time range.
+4. Run Search. Click any column header to sort.
+5. Export CSV to save the current results.
+
+## Security and privacy
+- The password is never written to disk; it lives in memory only and is
+  cleared on disconnect.
+- The optional debug log is off by default. When on, it writes
+  `Debug_Log_MMDDYYYY_HHMMSS.txt` next to the app with credentials redacted.
+
+## A note on how this was built
+This project was built with AI assistance. The design decisions, feature
+direction, and real-world testing were directed by me. The code was written
+and revised with an AI assistant against that direction.
+
+## License
+Released under the MIT License. Free to use, modify, and distribute; keep the
+copyright notice; no warranty. This tool bundles third-party code; see
+[THIRD-PARTY-LICENSES.txt](THIRD-PARTY-LICENSES.txt).
