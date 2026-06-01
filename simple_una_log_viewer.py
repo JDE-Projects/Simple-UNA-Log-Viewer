@@ -20,9 +20,14 @@ import time
 import threading
 import traceback
 from datetime import datetime
-from urllib.request import Request, HTTPCookieProcessor, build_opener, HTTPSHandler
+from urllib.request import (Request, HTTPCookieProcessor, build_opener,
+                            HTTPSHandler, urlopen)
 from urllib.error import URLError, HTTPError
 from http.cookiejar import CookieJar
+
+# Force the LGPL Qt binding (PySide6) so qtpy never selects a GPL PyQt build.
+# Must be set before webview pulls in qtpy.
+os.environ.setdefault("QT_API", "pyside6")
 
 import webview
 
@@ -105,6 +110,40 @@ def redact_payload(payload):
     return out
 
 
+def friendly_error(e, context=""):
+    """Map an exception to a short, plain-language message.
+
+    Full technical detail goes to the debug log (when enabled); the UI only
+    ever sees plain language, never a raw [Errno N] or traceback.
+    """
+    debug.log(f"ERROR {context}".strip(),
+              f"{type(e).__name__}: {e}\n{traceback.format_exc()}")
+    if isinstance(e, HTTPError):
+        return {
+            401: "Login failed. Check the username and password.",
+            403: "Access was denied by the controller.",
+            404: "The controller did not recognize that request.",
+        }.get(e.code, f"The controller returned an error (HTTP {e.code}).")
+    if isinstance(e, PermissionError):
+        return ("Permission denied. Pick a different location, or close the "
+                "file if it is already open.")
+    text = str(e).lower()
+    if isinstance(e, (URLError, OSError)):
+        if any(s in text for s in ("getaddrinfo", "name or service",
+                                   "nodename", "11001", "no address")):
+            return "Could not find that host. Check the controller URL."
+        if "refused" in text or "10061" in text:
+            return ("Connection refused. Check the URL and that the controller "
+                    "is reachable.")
+        if "timed out" in text or "timeout" in text:
+            return ("The connection timed out. Check the network and the "
+                    "controller URL.")
+        if "ssl" in text or "certificate" in text:
+            return "A secure-connection error occurred reaching the controller."
+        return "Could not reach the controller. Check the URL and your network."
+    return "Something went wrong. Turn on the debug log for the details."
+
+
 # ─────────────────────────────────────────────────────────────
 #  Timezone label (for column header + CSV)
 # ─────────────────────────────────────────────────────────────
@@ -130,6 +169,35 @@ def detect_local_tz_label():
 
 
 LOCAL_TZ_LABEL = detect_local_tz_label()
+
+
+# ─────────────────────────────────────────────────────────────
+#  Version + GitHub Releases update check
+#  APP_VERSION is the version of record; it equals the latest published
+#  release tag (without the leading v). Bump it as the first step of shipping.
+# ─────────────────────────────────────────────────────────────
+APP_VERSION = "1.0.0"
+GITHUB_OWNER = "JDE-Projects"
+GITHUB_REPO = "Simple-UNA-Log-Viewer"
+RELEASES_URL = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
+LATEST_RELEASE_API = (f"https://api.github.com/repos/{GITHUB_OWNER}/"
+                      f"{GITHUB_REPO}/releases/latest")
+
+
+def _parse_version(tag):
+    """Turn 'v1.2.3' (or '1.2') into a comparable (1, 2, 3) tuple."""
+    parts = []
+    for chunk in str(tag or "").strip().lstrip("vV").split("."):
+        digits = ""
+        for ch in chunk:
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        parts.append(int(digits) if digits else 0)
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts[:3])
 
 
 # ─────────────────────────────────────────────────────────────
@@ -191,6 +259,8 @@ class Api:
     def get_meta(self):
         return {
             "tz": LOCAL_TZ_LABEL,
+            "version": APP_VERSION,
+            "releases_url": RELEASES_URL,
             "time_ranges": [lbl for lbl, _ in TIME_RANGES],
             "default_time_range": DEFAULT_TIME_RANGE,
             "log_types": LOG_TYPES,
@@ -204,6 +274,47 @@ class Api:
         ok = debug.set_enabled(enabled)
         debug.log("Debug logging enabled" if enabled and ok else "Debug logging disabled")
         return {"ok": ok, "enabled": debug.is_enabled()}
+
+    # ---- update check (GitHub Releases; stdlib only, no token) ----
+    def check_update(self):
+        """Compare APP_VERSION to the latest published release tag.
+
+        update=True only when a newer tag exists. Quiet when the repo is
+        private / has no releases (GitHub returns 404) or when offline; the
+        UI decides whether to surface 'up to date' / 'could not check'.
+        """
+        try:
+            req = Request(LATEST_RELEASE_API, headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": f"Simple-UNA-Log-Viewer/{APP_VERSION}",
+            })
+            with urlopen(req, timeout=6) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            tag = data.get("tag_name", "") if isinstance(data, dict) else ""
+            newer = _parse_version(tag) > _parse_version(APP_VERSION)
+            debug.log("UPDATE CHECK",
+                      {"current": APP_VERSION, "latest": tag, "newer": newer})
+            return {"ok": True, "update": bool(newer and tag),
+                    "current": APP_VERSION, "latest": tag.lstrip("vV"),
+                    "url": RELEASES_URL}
+        except HTTPError as e:
+            # 404 = private repo or no releases yet; nothing worth showing.
+            debug.log("UPDATE CHECK http", f"{e.code} {e.reason}")
+            return {"ok": False, "reason": "unavailable", "current": APP_VERSION}
+        except (URLError, OSError) as e:
+            debug.log("UPDATE CHECK offline", str(e))
+            return {"ok": False, "reason": "offline", "current": APP_VERSION}
+        except Exception:
+            debug.log("UPDATE CHECK error", traceback.format_exc())
+            return {"ok": False, "reason": "error", "current": APP_VERSION}
+
+    def open_releases(self):
+        try:
+            import webbrowser
+            webbrowser.open(RELEASES_URL)
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": friendly_error(e, "OPEN_RELEASES")}
 
     # ---- connection ----
     def _create_opener(self):
@@ -304,8 +415,7 @@ class Api:
             return {"ok": True, "sites": sites}
         except Exception as e:
             self.connected = False
-            debug.log("CONNECT failed", str(e))
-            return {"ok": False, "error": str(e)}
+            return {"ok": False, "error": friendly_error(e, "CONNECT")}
 
     def disconnect(self):
         self._stop_keepalive()
@@ -380,8 +490,7 @@ class Api:
                       {"raw": total, "filtered": len(filtered), "had_error": had_error})
             return {"ok": True, "rows": filtered, "total": total, "had_error": had_error}
         except Exception as e:
-            debug.log("SEARCH exception", traceback.format_exc())
-            return {"ok": False, "error": str(e)}
+            return {"ok": False, "error": friendly_error(e, "SEARCH")}
 
     def _query_site_events(self, site, hours, log_type, categories_enum):
         site_name = site.get("name", "")
@@ -523,7 +632,7 @@ class Api:
             debug.log("EXPORT", f"{len(rows)} rows -> {path}")
             return {"ok": True, "path": path, "count": len(rows)}
         except Exception as e:
-            return {"ok": False, "error": str(e)}
+            return {"ok": False, "error": friendly_error(e, "EXPORT")}
 
 
 # ─────────────────────────────────────────────────────────────
