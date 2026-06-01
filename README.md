@@ -12,24 +12,27 @@ Built by [JDE-Projects](https://github.com/JDE-Projects).
 - Read-only: makes no changes to the controller, sites, or device state.
 - Optional debug log, off by default, with credentials redacted.
 - Secrets are never saved (memory only, wiped on disconnect).
+- Checks GitHub Releases for a newer version (at startup and on demand; silent when offline).
 
 ## How it works
 - Backend: Python standard library (urllib) against the controller's v2
   `system-log` API.
-- Window: pywebview on the Qt backend, UI in `simple_una_log_viewer-UI.html`.
+- Window: pywebview on the Qt backend (PySide6), UI in `simple_una_log_viewer-UI.html`.
 
 ## Download and run
-Grab the latest `Simple UNA Log Viewer.exe` from the Releases page and
-double-click it. No Python or setup required. Windows only.
+Grab the latest release from the Releases page, extract the zip, and run
+`Simple UNA Log Viewer.exe` from inside the folder. No Python or setup
+required. Windows only.
 Unsigned, so SmartScreen may warn the first time: More info > Run anyway.
 
 ## Build from source (optional)
 - Python 3 on PATH.
-- `pip install pywebview PyQt6 PyQt6-WebEngine`
+- `pip install pywebview PySide6 pyinstaller` (keep PyQt6 uninstalled so the
+  LGPL binding is the one bundled).
 - Keep `simple_una_log_viewer.py`, `simple_una_log_viewer-UI.html`, the
   `fonts/` folder, the `.ico`, `.png`, and `-splash.png` together.
 - Run from source: `python simple_una_log_viewer.py`
-- Build the .exe: `Build_Simple_UNA_Log_Viewer.bat` -> `dist\Simple UNA Log Viewer.exe`
+- Build the .exe: `Build_Simple_UNA_Log_Viewer.bat` -> `dist\Simple UNA Log Viewer\Simple UNA Log Viewer.exe`
 
 ## Using it
 1. Enter the controller URL, username, and password (a local admin account,
@@ -52,6 +55,8 @@ direction, and real-world testing were directed by me. The code was written
 and revised with an AI assistant against that direction.
 
 ## License
-Released under the MIT License. Free to use, modify, and distribute; keep the
-copyright notice; no warranty. This tool bundles third-party code; see
+Released under the PolyForm Noncommercial License 1.0.0 (see [LICENSE](LICENSE)).
+Personal and noncommercial use, modification, and noncommercial redistribution
+are permitted; commercial use is not. Keep the copyright notice; no warranty.
+This tool bundles third-party code; see
 [THIRD-PARTY-LICENSES.txt](THIRD-PARTY-LICENSES.txt).
