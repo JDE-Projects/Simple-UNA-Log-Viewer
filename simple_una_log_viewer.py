@@ -139,7 +139,8 @@ def friendly_error(e, context=""):
             return ("The connection timed out. Check the network and the "
                     "controller URL.")
         if "ssl" in text or "certificate" in text:
-            return "A secure-connection error occurred reaching the controller."
+            return ("A secure-connection error occurred reaching the controller. "
+                    "If it uses a self-signed certificate, turn off 'Verify TLS certificate'.")
         return "Could not reach the controller. Check the URL and your network."
     return "Something went wrong. Turn on the debug log for the details."
 
@@ -243,6 +244,7 @@ class Api:
         self.opener = None
         self.cookie_jar = None
         self.ssl_ctx = None
+        self.verify_tls = False   # off by default: self-hosted controllers use self-signed certs
         self.sites = []
         self.controller_url = ""
         self._cred_user = ""
@@ -319,8 +321,11 @@ class Api:
     # ---- connection ----
     def _create_opener(self):
         self.ssl_ctx = ssl.create_default_context()
-        self.ssl_ctx.check_hostname = False
-        self.ssl_ctx.verify_mode = ssl.CERT_NONE
+        if not self.verify_tls:
+            # Default: self-hosted controllers ship a self-signed certificate,
+            # so verification is off unless the user opts in.
+            self.ssl_ctx.check_hostname = False
+            self.ssl_ctx.verify_mode = ssl.CERT_NONE
         self.cookie_jar = CookieJar()
         self.opener = build_opener(HTTPSHandler(context=self.ssl_ctx),
                                    HTTPCookieProcessor(self.cookie_jar))
@@ -392,12 +397,13 @@ class Api:
             debug.log(f"UNEXPECTED on {url}", f"{type(e).__name__}: {e}\n{traceback.format_exc()}")
             raise
 
-    def connect(self, url, user, pwd):
+    def connect(self, url, user, pwd, verify=False):
         url = (url or "").strip().rstrip("/")
         user = (user or "").strip()
         pwd = (pwd or "").strip()
         if not url or not user or not pwd:
             return {"ok": False, "error": "Please fill in all connection fields."}
+        self.verify_tls = bool(verify)
         self.controller_url = url
         self._cred_user = user
         self._cred_pass = pwd
