@@ -60,3 +60,5 @@ Personal and noncommercial use, modification, and noncommercial redistribution
 are permitted; commercial use is not. Keep the copyright notice; no warranty.
 This tool bundles third-party code; see
 [THIRD-PARTY-LICENSES.txt](THIRD-PARTY-LICENSES.txt).
+
+For commercial licensing, open a [GitHub issue](https://github.com/JDE-Projects/Simple-UNA-Log-Viewer/issues) with the title "Commercial License Inquiry".
