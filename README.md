@@ -6,6 +6,8 @@ admins who need quick, focused log access across a site.
 
 Built by [JDE-Projects](https://github.com/JDE-Projects).
 
+If you enjoyed this project and would like to buy me a coffee, check out my [Ko-fi](https://ko-fi.com/jdeprojects).
+
 ## Highlights
 - Filter by site, time range, log type (General or Audit), category, and event.
 - Sortable results table; export everything to CSV (timezone-stamped column).
