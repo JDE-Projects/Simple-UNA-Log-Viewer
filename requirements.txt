@@ -1,0 +1,8 @@
+# Pinned build dependencies for Simple UNA Log Viewer.
+# Versions match the JDE pilot's green CI build (Python 3.14). This tool imports
+# nothing beyond the standard library, so no extra runtime deps are pinned.
+# Dependabot opens review-PRs for these == deps when newer releases appear.
+pywebview==6.2.1
+PySide6==6.11.1
+qtpy==2.4.3
+pyinstaller==6.21.0

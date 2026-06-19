@@ -3,11 +3,33 @@ echo =====================================================
 echo  Simple UNA Log Viewer - Build Script
 echo =====================================================
 echo.
+
+cd /d "%~dp0"
+
+REM --- skip interactive pauses when running in CI (GitHub Actions sets CI) ---
+set "PAUSE=pause"
+if defined CI set "PAUSE="
+
+REM --- check Python ---
+python --version >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Python is not installed or not in PATH.
+    echo Install Python 3 from https://python.org and tick "Add Python to PATH".
+    %PAUSE%
+    exit /b 1
+)
+
 echo Ensuring the LGPL Qt binding is the one bundled...
 pip uninstall -y PyQt6 PyQt6-WebEngine PyQt6-Qt6 PyQt6-sip >nul 2>&1
 echo.
-echo Installing build + runtime dependencies...
-pip install pywebview PySide6 pyinstaller
+echo Installing pinned dependencies from requirements.txt ...
+python -m pip install --upgrade pip >nul
+python -m pip install -r requirements.txt
+if errorlevel 1 (
+    echo ERROR: Failed to install dependencies from requirements.txt.
+    %PAUSE%
+    exit /b 1
+)
 echo.
 echo Building executable (onedir, so the bundled Qt stays replaceable)...
 set QT_API=pyside6
@@ -27,4 +49,4 @@ echo    dist\Simple UNA Log Viewer\
 echo  Run:  dist\Simple UNA Log Viewer\Simple UNA Log Viewer.exe
 echo =====================================================
 echo.
-pause
+%PAUSE%
