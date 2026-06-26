@@ -1,0 +1,3 @@
+Enter your UNA controller URL, username, and password, then click Connect.
+Pick a site, time range, and log type, optionally narrow by category/event, then Run Search.
+Click Export CSV to save the results. The app makes no changes to your controller.

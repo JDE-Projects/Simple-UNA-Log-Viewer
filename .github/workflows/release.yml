@@ -4,7 +4,7 @@ on:
     tags: ['v*']
 jobs:
   release:
-    uses: JDE-Projects/Build-Tools/.github/workflows/release.yml@69d4592847db552d34c49f36b8be2eb9e1af091d # Build-Tools main
+    uses: JDE-Projects/Build-Tools/.github/workflows/release.yml@41745cdc5e4ff7416d18e1b51e408ee62c93849e # Build-Tools main (installer support)
     permissions:
       id-token: write
       attestations: write
@@ -14,3 +14,4 @@ jobs:
       dist_subfolder: "Simple UNA Log Viewer"
       python_version: "3.14"
       build_command: "Build_Simple_UNA_Log_Viewer.bat"
+      app_id: "0c8c994c-416a-4eca-8c6b-3ac1351afea3"

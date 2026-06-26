@@ -177,7 +177,7 @@ LOCAL_TZ_LABEL = detect_local_tz_label()
 #  APP_VERSION is the version of record; it equals the latest published
 #  release tag (without the leading v). Bump it as the first step of shipping.
 # ─────────────────────────────────────────────────────────────
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 GITHUB_OWNER = "JDE-Projects"
 GITHUB_REPO = "Simple-UNA-Log-Viewer"
 RELEASES_URL = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
@@ -277,6 +277,33 @@ class Api:
         debug.log("Debug logging enabled" if enabled and ok else "Debug logging disabled")
         return {"ok": ok, "enabled": debug.is_enabled()}
 
+    # ---- theme preference (local .pref file next to the app) ----
+    def _pref_path(self):
+        return os.path.join(exe_dir(), "simple_una_log_viewer.pref")
+
+    def _load_theme(self):
+        try:
+            with open(self._pref_path(), "r", encoding="utf-8") as f:
+                theme = json.load(f).get("theme")
+            return theme if theme in ("dark", "light") else "dark"
+        except Exception:
+            return "dark"
+
+    def get_theme(self):
+        return self._load_theme()
+
+    def save_theme(self, theme):
+        if theme not in ("dark", "light"):
+            return {"ok": False}
+        try:
+            with open(self._pref_path(), "w", encoding="utf-8") as f:
+                json.dump({"theme": theme}, f)
+            debug.log(f"Theme set to {theme}")
+            return {"ok": True}
+        except Exception as e:
+            debug.log("Could not save theme pref", str(e))
+            return {"ok": False}
+
     # ---- update check (GitHub Releases; stdlib only, no token) ----
     def check_update(self):
         """Compare APP_VERSION to the latest published release tag.
@@ -317,6 +344,17 @@ class Api:
             return {"ok": True}
         except Exception as e:
             return {"ok": False, "error": friendly_error(e, "OPEN_RELEASES")}
+
+    def open_url(self, url):
+        """Open an external link in the system browser (used by the update notice)."""
+        try:
+            if isinstance(url, str) and url.startswith(("http://", "https://")):
+                import webbrowser
+                webbrowser.open(url)
+                return {"ok": True}
+        except Exception as e:
+            debug.log("open_url failed", str(e))
+        return {"ok": False}
 
     # ---- connection ----
     def _create_opener(self):
