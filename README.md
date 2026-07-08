@@ -30,7 +30,7 @@ If you enjoyed this project and would like to buy me a coffee, check out my [Ko-
 - Window: pywebview on the Qt backend (PySide6), UI in `simple_una_log_viewer-UI.html`.
 
 ## Download and run
-Two ways to get it from the Releases page - pick one:
+Two ways to get it from the [Releases](../../releases) page - pick one:
 - **Installer (recommended):** download `SimpleUNALogViewer-vX.Y.Z-setup.exe` and
   run it. Installs the app, adds a Start menu shortcut, and can be removed later
   from Add or Remove Programs. Installs just for you by default (no admin); you can
@@ -41,9 +41,18 @@ Two ways to get it from the Releases page - pick one:
 Windows only, no Python or setup required. Unsigned, so SmartScreen may warn the
 first time: More info > Run anyway.
 
+## Updating
+
+Simple UNA Log Viewer doesn't update itself. The status bar has a **Check for updates** button that tells you when a newer release is out; when it does, get the new version from the [Releases](../../releases) page the same way you first installed it.
+
+- **Installer:** download the new `SimpleUNALogViewer-vX.Y.Z-setup.exe` and run it. It installs over your current copy.
+- **Portable .zip:** download and extract the new `SimpleUNALogViewer-vX.Y.Z.zip`. If you want to keep your light/dark theme choice, copy `simple_una_log_viewer.pref` from the old folder into the new one (otherwise it just resets to dark).
+
+Your controller password is never stored, so there's nothing else to carry over.
+
 ## Verify this download (optional)
-This release was built on GitHub from this public source - not on a personal
-machine - and is signed with a build-provenance attestation. To confirm a
+This release was built on GitHub from this public source, not on a personal
+machine, and is signed with a build-provenance attestation. To confirm your
 download is genuine, install the [GitHub CLI](https://cli.github.com) and run:
 
 ```
@@ -55,15 +64,6 @@ gh attestation verify SimpleUNALogViewer-vX.Y.Z.zip \
 A `Verification succeeded!` line means the file was built by the published
 pipeline from this repo. You can also check the file against the published
 `.sha256`.
-
-## Updating
-
-Simple UNA Log Viewer doesn't update itself. The status bar has a **Check for updates** button that tells you when a newer release is out; when it does, get the new version from the [Releases](../../releases) page the same way you first installed it.
-
-- **Installer:** download the new `SimpleUNALogViewer-vX.Y.Z-setup.exe` and run it. It installs over your current copy.
-- **Portable .zip:** download and extract the new `SimpleUNALogViewer-vX.Y.Z.zip`. If you want to keep your light/dark theme choice, copy `simple_una_log_viewer.pref` from the old folder into the new one (otherwise it just resets to dark).
-
-Your controller password is never stored, so there's nothing else to carry over.
 
 ## Build from source (optional)
 - Python 3 on PATH.
@@ -92,7 +92,8 @@ Your controller password is never stored, so there's nothing else to carry over.
 ## A note on how this was built
 This project was built with AI assistance. The design decisions, feature
 direction, and real-world testing were directed by me. The code was written
-and revised with an AI assistant against that direction.
+and revised with an AI assistant against that direction. Treat it like any
+community tool: review and test it before relying on it.
 
 ## License
 Released under the PolyForm Noncommercial License 1.0.0 (see [LICENSE](LICENSE)).
