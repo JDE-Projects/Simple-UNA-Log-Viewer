@@ -653,8 +653,12 @@ class Api:
             return {"ok": False, "error": "Nothing to export."}
         if not self._window:
             return {"ok": False, "error": "No window."}
+        try:
+            dlg = webview.FileDialog.SAVE
+        except AttributeError:  # older pywebview
+            dlg = webview.SAVE_DIALOG
         result = self._window.create_file_dialog(
-            webview.SAVE_DIALOG, save_filename="una_log_export.csv",
+            dlg, save_filename="una_log_export.csv",
             file_types=("CSV file (*.csv)", "All files (*.*)"))
         if not result:
             return {"ok": False, "cancelled": True}
