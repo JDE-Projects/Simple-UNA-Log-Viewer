@@ -15,3 +15,6 @@ Debug_Log_*.txt
 
 # Theme preference (written next to the app)
 *.pref
+# Local planning notes (kept private, not shared)
+roadmap.md
+status.md
