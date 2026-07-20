@@ -16,9 +16,11 @@ import sys
 import ssl
 import csv
 import json
+import re
 import time
 import threading
 import traceback
+import webbrowser
 import ctypes
 from ctypes import wintypes
 from datetime import datetime
@@ -82,18 +84,64 @@ def save_prefs(prefs: dict) -> bool:
 
 def _win32():
     u = ctypes.windll.user32
-    u.FindWindowW.restype = wintypes.HWND
-    u.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
     u.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
     u.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
                                ctypes.c_int, ctypes.c_int, wintypes.UINT]
     return u
 
 
+def _own_window_handle(title):
+    """HWND of our own top-level window with this title.
+
+    FindWindowW matches by title across the whole desktop, so with a second
+    instance open it can return the other copy's window. Enumerate instead and
+    keep only a window owned by this process.
+    """
+    try:
+        u = ctypes.windll.user32
+        WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        u.EnumWindows.argtypes = [WNDENUMPROC, wintypes.LPARAM]
+        u.EnumWindows.restype = wintypes.BOOL
+        u.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+        u.GetWindowThreadProcessId.restype = wintypes.DWORD
+        u.GetWindowTextLengthW.argtypes = [wintypes.HWND]
+        u.GetWindowTextLengthW.restype = ctypes.c_int
+        u.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+        u.GetWindowTextW.restype = ctypes.c_int
+        u.IsWindowVisible.argtypes = [wintypes.HWND]
+        u.IsWindowVisible.restype = wintypes.BOOL
+
+        own_pid = os.getpid()
+        found = {"hwnd": None}
+
+        def _callback(hwnd, lparam):
+            if not u.IsWindowVisible(hwnd):
+                return True
+            pid = wintypes.DWORD()
+            u.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if pid.value != own_pid:
+                return True
+            length = u.GetWindowTextLengthW(hwnd)
+            if length <= 0:
+                return True
+            buf = ctypes.create_unicode_buffer(length + 1)
+            u.GetWindowTextW(hwnd, buf, length + 1)
+            if buf.value != title:
+                return True
+            found["hwnd"] = hwnd
+            return False   # stop enumerating, we found it
+
+        proc = WNDENUMPROC(_callback)   # kept alive for the duration of the call below
+        u.EnumWindows(proc, 0)
+        return found["hwnd"]
+    except Exception:
+        return None
+
+
 def _save_geometry(win) -> None:
     try:
         u = _win32()
-        hwnd = u.FindWindowW(None, win.title)
+        hwnd = _own_window_handle(win.title)
         if not hwnd:
             return
         r = wintypes.RECT()
@@ -130,7 +178,7 @@ def _restore_geometry(win) -> None:
         if not user32.MonitorFromPoint(point, 0):   # MONITOR_DEFAULTTONULL
             return
         u = _win32()
-        hwnd = u.FindWindowW(None, win.title)
+        hwnd = _own_window_handle(win.title)
         if not hwnd:
             return
         SWP_NOZORDER, SWP_NOACTIVATE = 0x0004, 0x0010
@@ -199,6 +247,14 @@ def redact_payload(payload):
         if k in out:
             out[k] = "***REDACTED***"
     return out
+
+
+def _csv_safe(value):
+    """Neutralize spreadsheet formula injection in an exported cell."""
+    text = "" if value is None else str(value)
+    if text.startswith(("=", "+", "-", "@", "\t", "\r")):
+        return "'" + text
+    return text
 
 
 def friendly_error(e, context=""):
@@ -325,6 +381,33 @@ EVENT_KEYS = {
 KEY_TO_EVENT_LABEL = {v: k for k, v in EVENT_KEYS.items()}
 
 
+def _sort_rows_for_export(rows, sort_col, sort_dir):
+    """Return a new list ordered the way the results table is showing it.
+
+    Mirrors the JS render() sort: "datetime" sorts on the numeric
+    datetime_raw key, anything else sorts on the lowercased text value.
+    sort_dir positive means ascending, anything else means descending.
+    Never raises on missing keys, bad types, or an unrecognized sort_col;
+    worst case it just leaves the rows in their existing order.
+    """
+    if not isinstance(sort_col, str) or not sort_col:
+        return list(rows)
+    try:
+        ascending = float(sort_dir) > 0
+    except (TypeError, ValueError):
+        ascending = False
+    if sort_col == "datetime":
+        def _key(r):
+            try:
+                return float(r.get("datetime_raw", 0) or 0)
+            except (TypeError, ValueError):
+                return 0.0
+    else:
+        def _key(r):
+            return str(r.get(sort_col, "") or "").lower()
+    return sorted(rows, key=_key, reverse=not ascending)
+
+
 # ─────────────────────────────────────────────────────────────
 #  JS-facing API
 # ─────────────────────────────────────────────────────────────
@@ -419,7 +502,6 @@ class Api:
 
     def open_releases(self):
         try:
-            import webbrowser
             webbrowser.open(RELEASES_URL)
             return {"ok": True}
         except Exception as e:
@@ -429,7 +511,6 @@ class Api:
         """Open an external link in the system browser (used by the update notice)."""
         try:
             if isinstance(url, str) and url.startswith(("http://", "https://")):
-                import webbrowser
                 webbrowser.open(url)
                 return {"ok": True}
         except Exception as e:
@@ -555,6 +636,8 @@ class Api:
         self.sites = []
         self.opener = None
         self.cookie_jar = None
+        self.controller_url = ""
+        self._cred_user = ""
         self._cred_pass = ""
         self._last_rows = []
         debug.log("DISCONNECTED")
@@ -623,7 +706,7 @@ class Api:
         now_ms = int(time.time() * 1000)
         from_ms = now_ms - (hours * 3600 * 1000)
         path_segment = "admin" if log_type == "Audit" else "all"
-        payload_categories = list(categories_enum) if categories_enum else list(set(CATEGORIES.values()))
+        payload_categories = list(categories_enum) if categories_enum else list(CATEGORIES.values())
         try:
             page_number, page_size, all_items = 0, 1000, []
             while True:
@@ -663,7 +746,6 @@ class Api:
         if not template or not isinstance(params, dict):
             return template or ""
         try:
-            import re
             def _replace(m):
                 sub = params.get(m.group(1))
                 return str(sub.get("name", m.group(0))) if isinstance(sub, dict) else m.group(0)
@@ -727,10 +809,11 @@ class Api:
         return out
 
     # ---- CSV export ----
-    def export_csv(self, rows):
-        rows = rows or self._last_rows
+    def export_csv(self, sort_col=None, sort_dir=-1):
+        rows = self._last_rows
         if not rows:
             return {"ok": False, "error": "Nothing to export."}
+        rows = _sort_rows_for_export(rows, sort_col, sort_dir)
         if not self._window:
             return {"ok": False, "error": "No window."}
         try:
@@ -752,11 +835,11 @@ class Api:
             ("ap", "ap"), ("ssid", "ssid"), ("network", "network"),
         ]
         try:
-            with open(path, "w", newline="", encoding="utf-8") as f:
+            with open(path, "w", newline="", encoding="utf-8-sig") as f:
                 w = csv.writer(f)
                 w.writerow([h for _, h in columns])
                 for r in rows:
-                    w.writerow([r.get(k, "") for k, _ in columns])
+                    w.writerow([_csv_safe(r.get(k, "")) for k, _ in columns])
             debug.log("EXPORT", f"{len(rows)} rows -> {path}")
             return {"ok": True, "path": path, "count": len(rows)}
         except Exception as e:
@@ -796,6 +879,7 @@ def _on_loaded():
     threading.Timer(delay, _close_splash).start()
 
 _mutex_handle = None   # module-level: must live for the process lifetime
+IS_SECOND_INSTANCE = False   # set True in main() when the user chooses to run a second copy
 
 def _acquire_single_instance(mutex_name: str) -> bool:
     # Name convention: "JDE_Simple{Thing}Tool_SingleInstance"
@@ -823,9 +907,11 @@ def _prompt_second_instance(app_title: str) -> bool:
 
 
 def main():
+    global IS_SECOND_INSTANCE
     if not _acquire_single_instance("JDE_SimpleUNALogViewer_SingleInstance"):
         if not _prompt_second_instance("Simple UNA Log Viewer"):
             sys.exit(0)
+        IS_SECOND_INSTANCE = True
 
     if HAS_SPLASH:
         threading.Timer(30.0, _close_splash).start()   # watchdog ceiling
@@ -833,7 +919,6 @@ def main():
     # Windows taskbar identity, so the taskbar shows our icon (not Python/Qt)
     if sys.platform == "win32":
         try:
-            import ctypes
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
                 "JDEProjects.SimpleUNALogViewer")
         except Exception:
@@ -849,12 +934,17 @@ def main():
     )
     api.set_window(window)
 
-    window.events.shown += lambda: _restore_geometry(window)
+    # Geometry save/restore locates the window by enumerating this process's
+    # own windows, so the lookup itself can't cross instances. Even so, a
+    # second instance should not adopt or overwrite the first instance's
+    # saved position. Only the first instance restores or saves geometry.
+    if not IS_SECOND_INSTANCE:
+        window.events.shown += lambda: _restore_geometry(window)
 
-    def _on_closing():
-        _save_geometry(window)
-        return True
-    window.events.closing += _on_closing
+        def _on_closing():
+            _save_geometry(window)
+            return True
+        window.events.closing += _on_closing
 
     window.events.loaded += _on_loaded
 

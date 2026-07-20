@@ -46,7 +46,7 @@ first time: More info > Run anyway.
 Simple UNA Log Viewer doesn't update itself. The status bar has a **Check for updates** button that tells you when a newer release is out; when it does, get the new version from the [Releases](../../releases) page the same way you first installed it.
 
 - **Installer:** download the new `SimpleUNALogViewer-vX.Y.Z-setup.exe` and run it. It installs over your current copy.
-- **Portable .zip:** download and extract the new `SimpleUNALogViewer-vX.Y.Z.zip`. If you want to keep your light/dark theme choice, copy `simple_una_log_viewer.pref` from the old folder into the new one (otherwise it just resets to dark).
+- **Portable .zip:** download and extract the new `SimpleUNALogViewer-vX.Y.Z.zip`. If you want to keep your light/dark theme choice and window size and position, copy `simple_una_log_viewer.pref` from the old folder into the new one (otherwise those just reset to default).
 
 Your controller password is never stored, so there's nothing else to carry over.
 

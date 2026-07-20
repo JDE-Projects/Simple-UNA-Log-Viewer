@@ -58,7 +58,16 @@
     border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px;
   }
   .panel-title{ font-weight:600; font-size:14px; margin:0 0 12px; letter-spacing:.2px; }
-  .panel-title-row{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+
+  /* ── app header ── */
+  .app-header{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
+    margin-bottom:12px; padding:0 2px; }
+  .app-header h1{ font-family:"Sora",sans-serif; font-weight:700; font-size:20px; margin:0;
+    color:var(--text); letter-spacing:-.2px; line-height:1.15; }
+  .byline{ font-size:11.5px; color:var(--text-dim); margin-top:3px; }
+  .byline a{ color:var(--accent); text-decoration:none; }
+  .byline a:hover{ text-decoration:underline; }
+
   .theme-btn{ background:transparent; border:1px solid var(--border-2); border-radius:var(--radius-sm);
     width:36px; height:36px; padding:0; display:flex; align-items:center; justify-content:center;
     cursor:pointer; color:var(--text-dim); transition:.15s; flex:0 0 auto; }
@@ -198,20 +207,26 @@
 <body>
 <div class="app">
 
+  <!-- Header -->
+  <div class="app-header">
+    <div>
+      <h1>Simple UNA Log Viewer</h1>
+      <div class="byline">by <a href="#" onclick="return openHome()">JDE-Projects</a></div>
+    </div>
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <circle cx="12" cy="12" r="4"/>
+        <path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/>
+      </svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+    </button>
+  </div>
+
   <!-- Connection -->
   <div class="panel">
-    <div class="panel-title-row">
-      <h2 class="panel-title">Controller Connection</h2>
-      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">
-        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-          <circle cx="12" cy="12" r="4"/>
-          <path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/>
-        </svg>
-        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
-        </svg>
-      </button>
-    </div>
+    <h2 class="panel-title">Controller Connection</h2>
     <div class="conn-grid">
       <div class="grow-url">
         <label class="field-label">Controller URL</label>
@@ -337,7 +352,6 @@
     buildSeg("typeSeg", META.log_types, META.default_log_type);
     buildChips("catChips", META.categories);
     buildChips("evtChips", META.events);
-    buildHead();
     COLS[0][1]="Date / Time ("+META.tz+")";
     buildHead();
     $("pass").addEventListener("keydown",e=>{ if(e.key==="Enter") onConn(); });
@@ -360,6 +374,8 @@
   }
   function updDownload(url){ if(url) API.open_url(url); const u=$("updateNotice"); if(u)u.classList.remove("show"); return false; }
   window.updDownload=updDownload;
+  function openHome(){ if(API) API.open_url("https://github.com/JDE-Projects"); return false; }
+  window.openHome=openHome;
   async function checkUpdate(manual){
     const r=await API.check_update();
     if(r.ok && r.update){
@@ -481,7 +497,7 @@
       const tr=document.createElement("tr");
       COLS.forEach(([key])=>{
         const td=document.createElement("td");
-        if(key==="severity"){ const s=(row.severity||""); td.innerHTML='<span class="sev '+s+'">'+s+'</span>'; }
+        if(key==="severity"){ const s=(row.severity||""); const sp=document.createElement("span"); sp.className="sev "+s; sp.textContent=s; td.appendChild(sp); }
         else { td.textContent=row[key]||""; td.className="col-"+key; td.title=row[key]||""; }
         tr.appendChild(td);
       });
@@ -504,7 +520,7 @@
 
   async function onExport(){
     if(!rows.length) return;
-    const r=await API.export_csv(rows);
+    const r=await API.export_csv(sortCol, sortDir);
     if(r.cancelled) return;
     if(r.ok) toast("Exported "+r.count+" event(s) to "+r.path);
     else toast(r.error||"Export failed",true);
