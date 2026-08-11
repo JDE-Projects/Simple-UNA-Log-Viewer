@@ -6,5 +6,7 @@ on:
 jobs:
   ci:
     uses: JDE-Projects/Build-Tools/.github/workflows/ci-windows.yml@ab90ba3459fe0e7cadab8d23d7e920d0bacabdaa # Build-Tools main (ruff, import check, pytest)
+    permissions:
+      contents: read
     with:
       entry_script: "simple_una_log_viewer.py"
