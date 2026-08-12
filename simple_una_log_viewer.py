@@ -11,9 +11,11 @@ UI in simple_una_log_viewer-UI.html.
 Built with AI assistance, directed by JDE-Projects.
 """
 
+import errno
 import os
-import sys
+import socket
 import ssl
+import sys
 import csv
 import json
 import re
@@ -24,9 +26,9 @@ import webbrowser
 import ctypes
 from ctypes import wintypes
 from datetime import datetime
+import urllib.error
 from urllib.request import (Request, HTTPCookieProcessor, build_opener,
                             HTTPSHandler, urlopen)
-from urllib.error import URLError, HTTPError
 from http.cookiejar import CookieJar
 
 # Force the LGPL Qt binding (PySide6) so qtpy never selects a GPL PyQt build.
@@ -265,7 +267,7 @@ def friendly_error(e, context=""):
     """
     debug.log(f"ERROR {context}".strip(),
               f"{type(e).__name__}: {e}\n{traceback.format_exc()}")
-    if isinstance(e, HTTPError):
+    if isinstance(e, urllib.error.HTTPError):
         return {
             401: "Login failed. Check the username and password.",
             403: "Access was denied by the controller.",
@@ -275,7 +277,7 @@ def friendly_error(e, context=""):
         return ("Permission denied. Pick a different location, or close the "
                 "file if it is already open.")
     text = str(e).lower()
-    if isinstance(e, (URLError, OSError)):
+    if isinstance(e, (urllib.error.URLError, OSError)):
         if any(s in text for s in ("getaddrinfo", "name or service",
                                    "nodename", "11001", "no address")):
             return "Could not find that host. Check the controller URL."
@@ -324,12 +326,71 @@ LOCAL_TZ_LABEL = detect_local_tz_label()
 #  APP_VERSION is the version of record; it equals the latest published
 #  release tag (without the leading v). Bump it as the first step of shipping.
 # ─────────────────────────────────────────────────────────────
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.4.1"
 GITHUB_OWNER = "JDE-Projects"
 GITHUB_REPO = "Simple-UNA-Log-Viewer"
 RELEASES_URL = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
 LATEST_RELEASE_API = (f"https://api.github.com/repos/{GITHUB_OWNER}/"
                       f"{GITHUB_REPO}/releases/latest")
+
+
+class _UnexpectedUpdateResponseError(ValueError):
+    """The update endpoint returned valid JSON in an unexpected shape."""
+
+
+def _update_error_reason(exc: BaseException) -> str:
+    """Return a plain-language, network-free update-check failure reason."""
+    if isinstance(exc, urllib.error.HTTPError):
+        if exc.code == 403:
+            return (
+                "GitHub is rate-limiting update checks from this network. "
+                "Try again later."
+            )
+        if exc.code == 404:
+            return "No published release was found."
+        if 500 <= exc.code < 600:
+            return f"GitHub is having trouble on its end (HTTP {exc.code})."
+        return f"GitHub returned an error (HTTP {exc.code})."
+
+    if isinstance(exc, (json.JSONDecodeError, _UnexpectedUpdateResponseError)):
+        return (
+            "GitHub returned something unexpected. This often means a proxy "
+            "or a guest wifi sign-in page answered instead."
+        )
+
+    is_url_error = isinstance(exc, urllib.error.URLError)
+    cause = exc.reason if is_url_error and exc.reason is not None else exc
+
+    if isinstance(cause, ssl.SSLCertVerificationError):
+        return (
+            "GitHub's certificate could not be verified. This usually means "
+            "antivirus or a network filter is inspecting HTTPS traffic."
+        )
+    if isinstance(cause, (ssl.SSLEOFError, ssl.SSLZeroReturnError)):
+        return "The secure connection was cut off during the handshake with GitHub."
+    if isinstance(cause, ssl.SSLError):
+        return "The secure connection to GitHub failed."
+    if isinstance(cause, socket.gaierror):
+        return (
+            "The address for api.github.com could not be looked up. Check "
+            "DNS or the internet connection."
+        )
+    if isinstance(cause, (socket.timeout, TimeoutError)):
+        return "GitHub didn't respond in time."
+    if isinstance(cause, (ConnectionRefusedError, ConnectionResetError)):
+        return (
+            "The connection was refused or reset. A firewall or proxy may "
+            "be blocking it."
+        )
+    if isinstance(cause, OSError) and getattr(cause, "errno", None) == errno.ENETUNREACH:
+        return "No network connection."
+    if is_url_error:
+        return "Couldn't reach GitHub. Check the internet connection."
+
+    text = f"{type(exc).__name__}: {exc}"
+    if len(text) > 120:
+        text = text[:117] + "..."
+    return text
 
 
 def _parse_version(tag):
@@ -469,36 +530,26 @@ class Api:
 
     # ---- update check (GitHub Releases; stdlib only, no token) ----
     def check_update(self):
-        """Compare APP_VERSION to the latest published release tag.
-
-        update=True only when a newer tag exists. Quiet when the repo is
-        private / has no releases (GitHub returns 404) or when offline; the
-        UI decides whether to surface 'up to date' / 'could not check'.
-        """
+        """Compare APP_VERSION to the latest published release tag."""
+        result = {"current": APP_VERSION, "version": None, "update": False, "offline": False}
         try:
             req = Request(LATEST_RELEASE_API, headers={
                 "Accept": "application/vnd.github+json",
                 "User-Agent": f"Simple-UNA-Log-Viewer/{APP_VERSION}",
             })
-            with urlopen(req, timeout=6) as resp:
+            with urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-            tag = data.get("tag_name", "") if isinstance(data, dict) else ""
-            newer = _parse_version(tag) > _parse_version(APP_VERSION)
-            debug.log("UPDATE CHECK",
-                      {"current": APP_VERSION, "latest": tag, "newer": newer})
-            return {"ok": True, "update": bool(newer and tag),
-                    "current": APP_VERSION, "latest": tag.lstrip("vV"),
-                    "url": RELEASES_URL}
-        except HTTPError as e:
-            # 404 = private repo or no releases yet; nothing worth showing.
-            debug.log("UPDATE CHECK http", f"{e.code} {e.reason}")
-            return {"ok": False, "reason": "unavailable", "current": APP_VERSION}
-        except (URLError, OSError) as e:
-            debug.log("UPDATE CHECK offline", str(e))
-            return {"ok": False, "reason": "offline", "current": APP_VERSION}
-        except Exception:
-            debug.log("UPDATE CHECK error", traceback.format_exc())
-            return {"ok": False, "reason": "error", "current": APP_VERSION}
+            if not isinstance(data, dict):
+                raise _UnexpectedUpdateResponseError("expected a JSON object")
+            latest = (data.get("tag_name") or "").lstrip("vV")
+            result["version"] = latest
+            result["update"] = bool(latest and _parse_version(latest) > _parse_version(APP_VERSION))
+            debug.log("UPDATE CHECK", f"found v{latest}, current v{APP_VERSION}")
+        except Exception as exc:
+            result["offline"] = True
+            result["reason"] = _update_error_reason(exc)
+            debug.log("UPDATE CHECK failed", f"{type(exc).__name__}: {exc}")
+        return result
 
     def open_releases(self):
         try:
@@ -575,7 +626,7 @@ class Api:
                 if rc != "ok" or dc == 0:
                     debug.log(f"RAW BODY (first 2000) for {url}", raw[:2000])
                 return parsed
-        except HTTPError as e:
+        except urllib.error.HTTPError as e:
             err = ""
             try:
                 err = e.read().decode("utf-8")[:2000]
@@ -586,7 +637,7 @@ class Api:
                 self._safe_reauth()
                 return self._api_request(path, method, data, retry=False)
             raise
-        except (URLError, OSError) as e:
+        except (urllib.error.URLError, OSError) as e:
             debug.log(f"URLError/OSError on {url}", str(e))
             if retry:
                 self._safe_reauth()
@@ -846,38 +897,6 @@ class Api:
             return {"ok": False, "error": friendly_error(e, "EXPORT")}
 
 
-# ─────────────────────────────────────────────────────────────
-#  Splash handling (guarded; 5s floor, close on ready, watchdog)
-# ─────────────────────────────────────────────────────────────
-try:
-    import pyi_splash  # type: ignore
-    HAS_SPLASH = True
-except Exception:
-    HAS_SPLASH = False
-
-_splash_closed = threading.Lock()
-_splash_done = False
-_start_time = time.time()
-
-
-def _close_splash():
-    global _splash_done
-    with _splash_closed:
-        if _splash_done:
-            return
-        _splash_done = True
-    if HAS_SPLASH:
-        try:
-            pyi_splash.close()
-        except Exception:
-            pass
-
-
-def _on_loaded():
-    elapsed = time.time() - _start_time
-    delay = max(0.0, 5.0 - elapsed)   # keep splash up at least 5s
-    threading.Timer(delay, _close_splash).start()
-
 _mutex_handle = None   # module-level: must live for the process lifetime
 IS_SECOND_INSTANCE = False   # set True in main() when the user chooses to run a second copy
 
@@ -907,14 +926,17 @@ def _prompt_second_instance(app_title: str) -> bool:
 
 
 def main():
+    try:
+        import truststore
+        truststore.inject_into_ssl()
+    except Exception:
+        pass
+
     global IS_SECOND_INSTANCE
     if not _acquire_single_instance("JDE_SimpleUNALogViewer_SingleInstance"):
         if not _prompt_second_instance("Simple UNA Log Viewer"):
             sys.exit(0)
         IS_SECOND_INSTANCE = True
-
-    if HAS_SPLASH:
-        threading.Timer(30.0, _close_splash).start()   # watchdog ceiling
 
     # Windows taskbar identity, so the taskbar shows our icon (not Python/Qt)
     if sys.platform == "win32":
@@ -929,7 +951,7 @@ def main():
         "Simple UNA Log Viewer",
         url=resource_path("simple_una_log_viewer-UI.html"),
         js_api=api,
-        width=1400, height=850, min_size=(1100, 700),
+        width=1400, height=850, min_size=(960, 700),
         background_color="#0a0e14",
     )
     api.set_window(window)
@@ -945,8 +967,6 @@ def main():
             _save_geometry(window)
             return True
         window.events.closing += _on_closing
-
-    window.events.loaded += _on_loaded
 
     try:
         webview.start(gui="qt", icon=resource_path("simple_una_log_viewer.png"))

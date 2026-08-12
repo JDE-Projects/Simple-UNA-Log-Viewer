@@ -35,7 +35,7 @@ echo Building executable (onedir, so the bundled Qt stays replaceable)...
 set QT_API=pyside6
 pyinstaller --onedir --windowed --name "Simple UNA Log Viewer" ^
   --icon "simple_una_log_viewer.ico" ^
-  --splash "simple_una_log_viewer-splash.png" ^
+  --hidden-import truststore ^
   --add-data "simple_una_log_viewer-UI.html;." ^
   --add-data "simple_una_log_viewer.png;." ^
   --add-data "fonts;fonts" ^

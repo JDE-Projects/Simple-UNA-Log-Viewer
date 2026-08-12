@@ -22,7 +22,8 @@ If you enjoyed this project and would like to buy me a coffee, check out my [Ko-
 - Read-only: makes no changes to the controller, sites, or device state.
 - Optional debug log, off by default, with credentials redacted.
 - Secrets are never saved (memory only, wiped on disconnect).
-- Checks GitHub Releases for a newer version (at startup and on demand; silent when offline).
+- Checks GitHub Releases for a newer version at startup and on demand. Startup
+  failures stay quiet; an on-demand failure explains what went wrong.
 
 ## How it works
 - Backend: Python standard library (urllib) against the controller's v2
@@ -68,9 +69,10 @@ pipeline from this repo. You can also check the file against the published
 ## Build from source (optional)
 - Python 3 on PATH.
 - `pip install -r requirements.txt` (pinned `pywebview`, `PySide6`, `qtpy`,
-  `pyinstaller`; keep PyQt6 uninstalled so the LGPL binding is the one bundled).
+  `pyinstaller`, and `truststore`; keep PyQt6 uninstalled so the LGPL binding
+  is the one bundled).
 - Keep `simple_una_log_viewer.py`, `simple_una_log_viewer-UI.html`, the
-  `fonts/` folder, the `.ico`, `.png`, and `-splash.png` together.
+  `fonts/` folder, the `.ico`, and `.png` together.
 - Run from source: `python simple_una_log_viewer.py`
 - Build the .exe: `Build_Simple_UNA_Log_Viewer.bat` -> `dist\Simple UNA Log Viewer\Simple UNA Log Viewer.exe`
 
