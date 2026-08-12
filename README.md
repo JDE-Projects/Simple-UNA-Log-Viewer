@@ -31,7 +31,13 @@ If you enjoyed this project and would like to buy me a coffee, check out my [Ko-
 - Window: pywebview on the Qt backend (PySide6), UI in `simple_una_log_viewer-UI.html`.
 
 ## Download and run
-Two ways to get it from the [Releases](../../releases) page - pick one:
+Install through WinGet:
+
+```
+winget install --exact --id JDE-Projects.SimpleUNALogViewer
+```
+
+Or pick one of the downloads from the [Releases](../../releases) page:
 - **Installer (recommended):** download `SimpleUNALogViewer-vX.Y.Z-setup.exe` and
   run it. Installs the app, adds a Start menu shortcut, and can be removed later
   from Add or Remove Programs. Installs just for you by default (no admin); you can
@@ -46,6 +52,7 @@ first time: More info > Run anyway.
 
 Simple UNA Log Viewer doesn't update itself. The status bar has a **Check for updates** button that tells you when a newer release is out; when it does, get the new version from the [Releases](../../releases) page the same way you first installed it.
 
+- **WinGet:** run `winget upgrade --exact --id JDE-Projects.SimpleUNALogViewer`.
 - **Installer:** download the new `SimpleUNALogViewer-vX.Y.Z-setup.exe` and run it. It installs over your current copy.
 - **Portable .zip:** download and extract the new `SimpleUNALogViewer-vX.Y.Z.zip`. If you want to keep your light/dark theme choice and window size and position, copy `simple_una_log_viewer.pref` from the old folder into the new one (otherwise those just reset to default).
 
