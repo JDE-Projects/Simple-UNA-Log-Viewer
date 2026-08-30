@@ -4,7 +4,7 @@ View, filter, and export connection and event logs from a UniFi Network
 Application controller, with filters the UNA web UI doesn't offer. For network
 admins who need quick, focused log access across a site.
 
-Built by [JDE-Projects](https://github.com/JDE-Projects).
+Built by [JDE-Projects](https://jde-projects.com), home of the Simple X Tools suite.
 
 If you enjoyed this project and would like to buy me a coffee, check out my [Ko-fi](https://ko-fi.com/jdeprojects).
 
@@ -97,6 +97,7 @@ pipeline from this repo. You can also check the file against the published
   cleared on disconnect.
 - The optional debug log is off by default. When on, it writes
   `Debug_Log_MMDDYYYY_HHMMSS.txt` next to the app with credentials redacted.
+- **Network use.** Other than the job you ask of it, this app makes one automatic network call: a check to GitHub for a newer release (at startup and when you press **Check for updates**), which sends only a version request. It collects and sends no personal data, usage data, or analytics.
 
 ## A note on how this was built
 This project was built with AI assistance. The design decisions, feature
