@@ -45,27 +45,31 @@ def test_update_error_reason_truncates_unknown_exception():
     assert len(reason) == 120
 
 
+_MAJOR, _MINOR, _PATCH = map(int, app.APP_VERSION.split("."))
+_NEWER = f"{_MAJOR}.{_MINOR}.{_PATCH + 1}"
+
+
 @pytest.mark.parametrize(
-    ("payload", "expected_version", "expected_update"),
+    ("latest", "expected_update"),
     [
-        ({"tag_name": "v1.4.2"}, "1.4.2", True),
-        ({"tag_name": "v1.4.1"}, "1.4.1", False),
+        (_NEWER, True),
+        (app.APP_VERSION, False),
     ],
 )
-def test_check_update_handles_release_response(
-    monkeypatch, payload, expected_version, expected_update
-):
+def test_check_update_handles_release_response(monkeypatch, latest, expected_update):
     monkeypatch.setattr(
         app,
         "urlopen",
-        lambda request, timeout: io.BytesIO(json.dumps(payload).encode("utf-8")),
+        lambda request, timeout: io.BytesIO(
+            json.dumps({"tag_name": f"v{latest}"}).encode("utf-8")
+        ),
     )
 
     result = app.Api().check_update()
 
     assert result == {
         "current": app.APP_VERSION,
-        "version": expected_version,
+        "version": latest,
         "update": expected_update,
         "offline": False,
     }
