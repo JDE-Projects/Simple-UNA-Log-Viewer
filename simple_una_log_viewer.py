@@ -326,7 +326,7 @@ LOCAL_TZ_LABEL = detect_local_tz_label()
 #  APP_VERSION is the version of record; it equals the latest published
 #  release tag (without the leading v). Bump it as the first step of shipping.
 # ─────────────────────────────────────────────────────────────
-APP_VERSION = "1.4.1"
+APP_VERSION = "1.4.2"
 GITHUB_OWNER = "JDE-Projects"
 GITHUB_REPO = "Simple-UNA-Log-Viewer"
 RELEASES_URL = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
